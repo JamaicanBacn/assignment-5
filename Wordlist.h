@@ -19,12 +19,12 @@ public:
 	AVLTreeNode* left;
 
 	string word;
-	int word_count;
-	int height;
+	unsigned int count;
+	unsigned int height;
 
 
 
-	AVLTreeNode( string data) : word(data) , left(nullptr) , right(nullptr) , parent(nullptr) , height(0) {};
+	AVLTreeNode( string data) : word(data) , left(nullptr) , right(nullptr) , parent(nullptr) , height(0) , count(0) {};
 	// Should have attributes named:
 	// parent - pointer to parent
 	// left - pointer to left child
@@ -50,6 +50,9 @@ private:
 	int height(AVLTreeNode* node);
 	AVLTreeNode* right_rotation(AVLTreeNode* node);
 	AVLTreeNode* left_rotation(AVLTreeNode* node);
+	AVLTreeNode* Avl_insertion_handling( AVLTreeNode* node , string data);
+	AVLTreeNode* findMaximum(AVLTreeNode* node);
+	int singleton_travesal(AVLTreeNode* node);
 
 public:
 	// public methods go here
@@ -59,7 +62,9 @@ public:
 
 	void insert(string data);
 	int differentWords();
-
+	int totalWords();
+	string mostFrequent();
+	int singletons();
 	// Prints useful statistics about the word list
 	//void Wordlist::printStatistics() const;
 

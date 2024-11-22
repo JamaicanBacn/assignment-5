@@ -3,6 +3,7 @@
 using std::setprecision;
 using std::fixed;
 using std::max;
+using std::to_string;
 
 // Prints useful statistics about the word list
 
@@ -46,11 +47,9 @@ Wordlist::Wordlist(string fname)
 
 	while( myFile >> next )
 	{
-		cout << next << endl;
 		this->insert(next);
 	}
 
-	cout << "file has been completely read" << endl;
 	myFile.close();
 
 
@@ -84,7 +83,6 @@ AVLTreeNode* Wordlist::right_rotation(AVLTreeNode* node)
 
 
 	AVLTreeNode* new_root = node->left;
-	cout << ( new_root == nullptr ) << endl;
 	AVLTreeNode* right_content = node->left->right; // breaking here because node->left == nullptr
 
 	/*
@@ -178,123 +176,83 @@ AVLTreeNode* Wordlist::left_rotation(AVLTreeNode* node)
 
 void Wordlist::insert( string data ) 
 {
-	AVLTreeNode* iterate = root; // make a temp ptr
-	AVLTreeNode* prev = nullptr; // make a ptr to the node that will be the new nodes parent
-	total_words++; // each insertion means one new word is added 
 
 	/*
 	
-		using the prev and iterate, go through the avl tree.
-		if the current node is geater than the data then go left and vice versa
-
-		if the data is already in the tree then increment the word couter for that node
-		if the iterate pointer becomes the nullptr then we have found a new leaf spot for
-		the new node
+		Insertion function for the node with value data
+		handles the balancing and the insertion for the underlying avl tree
 	
 	*/
 
-	// if the root is the nullptr
-	if(root == nullptr)
+	// each time this funciton is called there is one word added
+	// set root to the return value the final return is the root
+
+	root = Avl_insertion_handling(root,data); 
+
+}
+
+AVLTreeNode* Wordlist::Avl_insertion_handling( AVLTreeNode* node, string data)
+{
+
+	// check if the first node is the nullptr to being the avl tree
+	if( node == nullptr)
 	{
-		nodes++;
-		root = new AVLTreeNode(data);
-		return;
+		nodes++; // each time a new node is made there is one more to the count
+		return new AVLTreeNode(data);
 	}
 
-	while( iterate != nullptr )
-	{
-		prev = iterate; // set the prev node to the iterate before it moves down
+	// basic bst mapping down to the next open leaf node
 
-		if( data > iterate->word )
-		{
-			iterate = iterate->right;
-		}
-		else if( data < iterate->word)
-		{
-			iterate = iterate->left;
-		}
-		else if(data == iterate->word)
-		{
-			iterate->word_count++;
-			return;
-		}
+	if(data < node->word)
+	{
+		node->left = Avl_insertion_handling(node->left , data);
+		node->left->parent = node;
 	}
-
-	// make iterate the new node with the data pointed to by prev
-
-	nodes++;
-	iterate = new AVLTreeNode(data);
-	
-	if( prev->word < data)
+	else if( data > node->word)
 	{
-		prev->right = iterate;
+		node->right = Avl_insertion_handling(node->right,data);
+		node->right->parent = node;
 	}
 	else
 	{
-		prev->left = iterate;
+		// check the work on this function it is never getting inside
+		node->count += 1;
+		return node;
 	}
 
-	int balance; // initialize balance monitering variable
+	// take the height of the node to check for the balance 
 
-	/*
-	
-		the prev node is the parent of the iterate node
-		take the prev node and change it to the new height and check balance
+	node->height = 1 + max(height(node->left) , height(node->right));
 
-		decide what rotations to make
-		by handing back the rotation as a pointer the parent node will point to the newly
-		rotated node in the tree hence making it all connected 
+	int balance = balance_factor(node);
 
-		repeat this process until current node is the nullptr meaning that we are above the root
-	
-	*/
+	// rotation for type of node im-balance
 
-	/*
-	
-		prod issue
-
-		i think the pointer 
-	
-	*/
-
-	
-
-	while( prev != nullptr)
+	if( balance > 1 && data < node->left->word )
 	{
-
-		prev->height = 1 + max( height(prev->left) , height(prev->right) ); // set height
-		balance = balance_factor(prev); // check if the current node is balance
-
-		//check if the left is heavier and the node is to the left of the left child
-
-		if( balance > 1 && data < prev->left->word)
-		{	
-			//right rotation
-			prev = right_rotation(prev);
-		}
-		else if( balance < -1 && data > prev->right->word)
-		{
-			//single left
-			prev = left_rotation(prev);
-
-		}
-		else if( balance > 1 && data > prev->left->word)
-		{	
-			//left right case
-			prev->left = left_rotation(prev->left);
-			prev = right_rotation(prev);
-
-		}
-		else if( balance < -1 && data < prev->right->word  )
-		{	
-			cout << "right left" << endl;	
-			prev->right = right_rotation(prev->right);
-			prev = left_rotation(prev);
-		}
-
-		prev = prev->parent;
-
+		return right_rotation(node);
 	}
+
+	if( balance < -1 && data > node->right->word)
+	{
+		return left_rotation(node);
+	}
+
+	if( balance > 1 && data > node->left->word)
+	{
+		node->left = left_rotation(node->left);
+		return right_rotation(node);
+	}
+
+	if( balance < -1 && data < node->right->word)
+	{
+		node->right = right_rotation(node->right);
+		return left_rotation(node);
+	}
+
+
+	return node;
+	
 
 
 }
@@ -302,4 +260,72 @@ void Wordlist::insert( string data )
 int Wordlist::differentWords()
 {
 	return nodes;
+}
+
+int Wordlist::totalWords()
+{
+	return total_words;
+}
+
+string Wordlist::mostFrequent()
+{
+
+	// put the exception code here 
+	AVLTreeNode* temp = root;
+	AVLTreeNode* largest = findMaximum(temp);
+	
+
+
+	return( largest->word + " " + to_string(largest->count));
+
+}
+
+AVLTreeNode* Wordlist::findMaximum( AVLTreeNode* node )
+{
+	// uses the in order traversal to find the max value 
+
+	AVLTreeNode* min_node = new AVLTreeNode("");
+
+	if( node == nullptr)
+	{
+		return min_node;
+	}
+
+	AVLTreeNode* left = findMaximum(node->left);
+	AVLTreeNode* right = findMaximum(node->right);
+	AVLTreeNode* ret = node;
+
+
+	if( left->count > node->count)
+	{
+		ret = left;
+	}
+	if(right->count  > ret->count )
+	{
+		ret = right;
+	}
+
+	return ret;
+	
+}
+
+int Wordlist::singleton_travesal(AVLTreeNode* node)
+{
+	if( node == nullptr)
+	{
+		return 0;
+	}
+
+	if( node->count == 1)
+	{
+		return 1 + singleton_travesal(node->left) + singleton_travesal(node->right);
+	}
+	else{
+		return singleton_travesal(node->left) + singleton_travesal(node->right);
+	}
+}
+
+int Wordlist::singletons()
+{
+	return singleton_travesal(root);
 }
