@@ -4,11 +4,11 @@ using std::setprecision;
 using std::fixed;
 using std::max;
 using std::to_string;
+using std::invalid_argument;
 
 // Prints useful statistics about the word list
 
 /*
-
 
 void Wordlist::printStatistics() const
 {
@@ -34,6 +34,12 @@ Wordlist::Wordlist()
 
 }
 
+Wordlist::~Wordlist()
+{
+	//breaks down the tree
+	Decomposition(root); // reccursive function to break down tree
+}
+
 Wordlist::Wordlist(string fname)
 {
 
@@ -41,17 +47,42 @@ Wordlist::Wordlist(string fname)
 	nodes = 0;
 	total_words =0;
 
-	ifstream myFile;
+	ifstream myFile; // file ptr
 	myFile.open(fname);
 	string next;
 
 	while( myFile >> next )
 	{
+		//insert each word into the file
 		this->insert(next);
 	}
 
 	myFile.close();
 
+
+}
+
+Wordlist::Wordlist(const Wordlist& reference)
+{
+	// tree copy function returns the root of a deep copy of reference
+	root = this->treeCopy(reference.getRoot());
+	nodes = reference.nodes;
+	total_words = reference.total_words;
+}
+
+Wordlist& Wordlist::operator=(const Wordlist& reference)
+{
+	//check for self assignment 
+	if( this == &reference )
+	{
+		return *this;
+	}
+
+	root = this->treeCopy(reference.getRoot());
+	nodes = reference.nodes;
+	total_words = reference.total_words;
+
+	return *this;
 
 }
 
@@ -85,18 +116,6 @@ AVLTreeNode* Wordlist::right_rotation(AVLTreeNode* node)
 	AVLTreeNode* new_root = node->left;
 	AVLTreeNode* right_content = node->left->right; // breaking here because node->left == nullptr
 
-	/*
-		prod issue
-		The function is calling the left right rotation on the nodes when there is no left node
-		meaing that the incorrect roation is being called
-		this can imply that the heigth of the nodes is incorrect 
-		this would make the balance factor have an incorrect value 
-		meaing that the incorrect roation would be called 
-
-		where the height could be going wrong.
-		after the insertion the rebalancing of the nodes up the tree
-
-	*/
 
 	// make the new root point to the old root
 	// make the new roots parent the old roots parent
@@ -142,19 +161,6 @@ AVLTreeNode* Wordlist::left_rotation(AVLTreeNode* node)
 	node->parent = new_root;
 	node->right = left_content;
 
-	/*
-	
-		resons that the assignment bellow could be breaking
-		- left content is the nullptr and trying to call the parent fuction is bearking it
-
-		found that the left content is the nullptr
-
-		fix:
-			make check if the nullptr is the left content
-			if it is then no need to reassign the pointer
-	
-	*/
-
 
 	// check if the left_content is the nullptr to avoid crashing
 	if( left_content != nullptr)
@@ -189,6 +195,20 @@ void Wordlist::insert( string data )
 
 	root = Avl_insertion_handling(root,data); 
 
+}
+
+bool Wordlist::remove(string data)
+{
+	//check if the tree even contains the word
+	if( !this->contains(data))
+	{
+		return false;
+	}
+
+	//return the root of the tree without the node
+	root = Avl_removal_handling(root,data);
+	return true;
+	
 }
 
 AVLTreeNode* Wordlist::Avl_insertion_handling( AVLTreeNode* node, string data)
@@ -257,25 +277,160 @@ AVLTreeNode* Wordlist::Avl_insertion_handling( AVLTreeNode* node, string data)
 
 }
 
+AVLTreeNode* Wordlist::Avl_removal_handling(AVLTreeNode* node, string data)
+{
+	//  if the node is the nu
+
+	if( node == nullptr)
+	{
+		return node;
+	}
+
+	if( data < node->word)
+	{
+		node->left = Avl_removal_handling(node->left, data);
+	}
+	else if( data > node->word)
+	{
+		node->right = Avl_removal_handling(node->right , data);	
+	}
+	else{
+		
+		nodes --;
+		total_words -= node->count;
+
+		// check if the node has a child
+		if( (node->left == nullptr) || (node->right == nullptr) )
+		{	
+			// assign temp to the child node that is not the nullptr
+			AVLTreeNode* temp = node->left ? node->left : node->right;
+
+
+			// if both are the nullptr then there is no replacment
+			if(temp == nullptr)
+			{
+				temp = node;
+				node = nullptr;
+			}
+			else{
+				//if there is a child node make node == temp
+				node->word = temp->word;
+				node->count = temp->count;
+
+				node->right = temp->right;
+				node->left = temp->left;
+
+			}
+			// free temp to remove the node from the tree 
+			free(temp);
+		}
+		else{
+			/*
+			
+				if there are two children find the sucessor for replacment
+				then do a search for the temp node as it must be removed
+
+			*/
+			AVLTreeNode* temp = predecessor(node->right);
+			node->count = temp->count;
+			node->word = temp->word;
+			node->right = Avl_removal_handling(node->right, temp->word);
+
+		}
+
+	}
+
+	/*
+	
+		check that the current node isnt the nullptr
+		from the inital ternary statment 
+
+		this is so that the calls after this do not break the process
+	
+	*/
+
+	if(node == nullptr)
+	{
+		return node; 
+	}
+
+	/*
+	
+		check for node rotations
+		for the removal check for imbalences in the current node
+		and the node bellow to know the type of rotation that is needed
+	
+	*/
+
+	node->height = 1 + max( height(node->left) , height(node->right));
+
+	int balance = balance_factor(node);
+
+	if( balance > 1 && balance_factor(node->left) >= 0)
+	{
+		return right_rotation(node);
+	}
+
+	if( balance < -1 && balance_factor(node->right) <= 0)
+	{
+		return left_rotation(node);
+	}
+
+	if( balance > 1 && balance_factor(node->left) < 0)
+	{
+		node->left = left_rotation(node->left);
+		return right_rotation(node);
+	}
+
+	if(balance < -1 && balance_factor(node->right) > 0)
+	{
+		node->right = right_rotation(node->right);
+		return left_rotation(node);
+	}
+
+	// if the subtree is balanced then return the node 
+	return node;
+
+
+}
+
 int Wordlist::differentWords()
 {
-	return nodes;
+	return nodes; // keeps track of all unique nodes
 }
 
 int Wordlist::totalWords()
 {
-	return total_words;
+	return total_words; // the sum of all word counts
 }
 
 string Wordlist::mostFrequent()
 {
 
+	try
+	{
+		if(nodes == 0)
+		{
+			throw std::invalid_argument("runtime error");
+		}	
+	}
+	catch( std::runtime_error& e)
+	{
+		std::cerr << "Exception: " << e.what() << endl;
+		exit(0);
+	}
+
+	catch(const std::exception& e)
+	{
+		std::cerr << e.what() << '\n';
+	}
+		
 	// put the exception code here 
 	AVLTreeNode* temp = root;
 	AVLTreeNode* largest = findMaximum(temp);
 	
 
-
+	// returns tha most common word in the list
 	return( largest->word + " " + to_string(largest->count));
 
 }
@@ -284,6 +439,7 @@ AVLTreeNode* Wordlist::findMaximum( AVLTreeNode* node )
 {
 	// uses the in order traversal to find the max value 
 
+	// make a node with a count of zero
 	AVLTreeNode* min_node = new AVLTreeNode("");
 
 	if( node == nullptr)
@@ -316,6 +472,7 @@ int Wordlist::singleton_travesal(AVLTreeNode* node)
 		return 0;
 	}
 
+	// if the node has a count of one return one plus the traversal on the children
 	if( node->count == 1)
 	{
 		return 1 + singleton_travesal(node->left) + singleton_travesal(node->right);
@@ -328,4 +485,116 @@ int Wordlist::singleton_travesal(AVLTreeNode* node)
 int Wordlist::singletons()
 {
 	return singleton_travesal(root);
+}
+
+void Wordlist::printWords()
+{
+	postOrderTraversal(root,0);
+}
+
+int Wordlist::postOrderTraversal(AVLTreeNode* node , int print_order)
+{
+	if( node == nullptr)
+	{
+		return print_order;
+	}
+
+	print_order = postOrderTraversal(node->left , print_order);
+	print_order++;
+
+	cout << print_order << "." << node->word << " " << node->count << endl;
+
+	print_order = postOrderTraversal(node->right , print_order);
+
+	return print_order;
+}
+
+AVLTreeNode* Wordlist::treeCopy(const AVLTreeNode* node)
+{
+	if( node == nullptr )
+	{
+		return nullptr;
+	}
+
+	// for each node in the reference tree make a new node
+	//  copy all of the arributtes then make deeps copies for the rest
+	AVLTreeNode* current = new AVLTreeNode(node->word);
+	current->count = node->count;
+	current->height = node->height;
+
+	current->left = treeCopy(node->left);
+	current->right = treeCopy(node->right);
+
+	return current;
+
+
+
+}
+
+void Wordlist::Decomposition(AVLTreeNode* node)
+{
+	if(node == nullptr)
+	{
+		return;
+	}
+
+	Decomposition(node->left);
+	Decomposition(node->right);
+
+	// if the node is a leaf remove it
+	//uses dsf do so it can return 
+	delete node;
+	
+
+
+}
+
+int Wordlist::getCount(string data)
+{
+	AVLTreeNode* iterate = root;
+
+	/*
+	
+		checks the path the node would be on
+		if found returns the nodes count
+		if not found returns 0 as the word does not occur
+
+	*/
+
+
+	while(iterate != nullptr)
+	{
+		if( data < iterate->word)
+		{
+			iterate = iterate->left;
+		}
+		else if( data > iterate->word)
+		{
+			iterate = iterate->right;
+		}
+		else
+		{
+			return iterate->count;
+		}
+	}
+
+	return 0;
+}
+
+bool Wordlist::contains(string data)
+{
+	// if the count is less than 1 it has not appeared
+	return this->getCount(data) > 0;
+}
+
+AVLTreeNode* Wordlist::predecessor(AVLTreeNode* node)
+{
+	AVLTreeNode* iterate = node;
+
+	while( iterate->left != nullptr )
+	{
+		iterate = iterate->left;
+	}
+
+	return iterate;
 }
